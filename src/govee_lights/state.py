@@ -30,6 +30,8 @@ class Cache:
         )
 
     def prune_stale(self, now: datetime, ttl_seconds: int | None = None) -> None:
+        if now.tzinfo is None:
+            raise ValueError("prune_stale: 'now' must be a timezone-aware datetime")
         if ttl_seconds is None:
             ttl_seconds = config.SESSION_TTL_SECONDS
         cutoff = now.timestamp() - ttl_seconds

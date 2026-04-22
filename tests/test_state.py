@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime, timezone
 
 from govee_lights.state import Cache, SessionEntry, load_cache, save_cache
@@ -84,3 +85,22 @@ def test_prune_stale_keeps_entries_exactly_at_cutoff():
     })
     c.prune_stale(now, ttl_seconds=30 * 60)
     assert "edge" in c.sessions
+
+
+def test_prune_stale_rejects_naive_datetime():
+    naive = datetime(2026, 4, 22, 12, 0, 0)  # no tzinfo
+    c = Cache()
+    with pytest.raises(ValueError, match="timezone-aware"):
+        c.prune_stale(naive)
+
+
+def test_prune_stale_falls_back_to_config_session_ttl(monkeypatch):
+    from govee_lights import config
+    monkeypatch.setattr(config, "SESSION_TTL_SECONDS", 10)  # tiny TTL
+    now = datetime(2026, 4, 22, 12, 0, 0, tzinfo=timezone.utc)
+    c = Cache(sessions={
+        "stale":  SessionEntry(state="working", updated_at="2026-04-22T11:59:00+00:00"),  # 60s old > 10s TTL
+        "fresh":  SessionEntry(state="working", updated_at="2026-04-22T11:59:55+00:00"),  # 5s old < 10s TTL
+    })
+    c.prune_stale(now)  # no explicit ttl, should use config.SESSION_TTL_SECONDS
+    assert list(c.sessions) == ["fresh"]
