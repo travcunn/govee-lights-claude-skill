@@ -27,6 +27,7 @@ def _apply_state(state: str, session_id: str) -> None:
         cache.prune_stale(now)
         aggregate = cache.aggregate_state()
         if aggregate == cache.current_color:
+            # Early return still saves the cache via locked_cache's __exit__; skips Govee push only.
             return
         _push_color(aggregate)
         cache.current_color = aggregate
@@ -39,6 +40,7 @@ def _remove_session(session_id: str) -> None:
         cache.prune_stale(now)
         aggregate = cache.aggregate_state()
         if aggregate == cache.current_color:
+            # Same as _apply_state: locked_cache saves on exit, we just skip the Govee push.
             return
         _push_color(aggregate)
         cache.current_color = aggregate
