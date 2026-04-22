@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from . import config
@@ -19,6 +20,24 @@ class SessionEntry:
 class Cache:
     sessions: dict[str, SessionEntry] = field(default_factory=dict)
     current_color: str = "working"
+
+    def aggregate_state(self) -> str:
+        if not self.sessions:
+            return "working"
+        return max(
+            (entry.state for entry in self.sessions.values()),
+            key=lambda s: config.PRIORITY[s],
+        )
+
+    def prune_stale(self, now: datetime, ttl_seconds: int | None = None) -> None:
+        if ttl_seconds is None:
+            ttl_seconds = config.SESSION_TTL_SECONDS
+        cutoff = now.timestamp() - ttl_seconds
+        self.sessions = {
+            sid: entry
+            for sid, entry in self.sessions.items()
+            if datetime.fromisoformat(entry.updated_at).timestamp() >= cutoff
+        }
 
     def to_dict(self) -> dict:
         return {
