@@ -28,8 +28,8 @@ def test_cache_path_is_under_user_cache_dir():
     assert config.CACHE_PATH == Path.home() / ".cache" / "govee-lights" / "state.json"
 
 
-def test_session_ttl_is_30_minutes():
-    assert config.SESSION_TTL_SECONDS == 30 * 60
+def test_session_ttl_is_2_minutes():
+    assert config.SESSION_TTL_SECONDS == 2 * 60
 
 
 def test_load_api_key_reads_environment(monkeypatch):

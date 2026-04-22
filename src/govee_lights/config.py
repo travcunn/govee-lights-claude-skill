@@ -32,7 +32,7 @@ PRIORITY: dict[str, int] = {
 }
 
 CACHE_PATH: Path = Path.home() / ".cache" / "govee-lights" / "state.json"
-SESSION_TTL_SECONDS: int = 30 * 60
+SESSION_TTL_SECONDS: int = 2 * 60
 BRIGHTNESS_PERCENT: int = 100
 
 

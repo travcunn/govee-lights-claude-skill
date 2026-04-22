@@ -61,7 +61,7 @@ Each hook invocation calls `hooks/govee-hook`, which runs `uv run govee-lights <
 
 1. Acquires a `fcntl.flock` on `~/.cache/govee-lights/state.lock` to serialize parallel sessions.
 2. Updates this session's entry in `~/.cache/govee-lights/state.json` (session ID comes from Claude's hook payload on stdin).
-3. Prunes entries older than 30 minutes (cleans up crashed sessions).
+3. Prunes entries older than 2 minutes (cleans up crashed sessions; live sessions heartbeat on every hook fire, so they never expire).
 4. Computes the aggregate color via priority ladder: `permission > your-turn > working`.
 5. If the aggregate differs from the currently-pushed color, POSTs to the Govee API for each target device. Otherwise exits immediately.
 
@@ -76,6 +76,6 @@ uv run pytest -v
 ## Notes
 
 - API key lives in `.env` (gitignored). Never commit it.
-- Stale session entries in the local cache self-expire after 30 minutes.
+- Stale session entries in the local cache self-expire after 2 minutes. Live sessions refresh their entry on every hook fire, so only crashed / abandoned sessions age out.
 - Hooks always exit 0 so Govee failures never block Claude Code.
 - The `list-devices` subcommand is handy for grabbing `device_id` / `sku` values when editing `TARGET_DEVICES`.
