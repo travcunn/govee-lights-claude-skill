@@ -65,6 +65,22 @@ def test_set_color_temperature_posts_correct_payload():
     assert cap["value"] == 2700
 
 
+def test_set_brightness_posts_correct_payload():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"code": 200, "msg": "success"})
+
+    client = _mock_client(handler)
+    client.set_brightness(sku="H6076", device_id="AA:BB", percent=100)
+
+    cap = seen["body"]["payload"]["capability"]
+    assert cap["type"] == "devices.capabilities.range"
+    assert cap["instance"] == "brightness"
+    assert cap["value"] == 100
+
+
 def test_non_2xx_raises():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"code": 401, "msg": "invalid key"})

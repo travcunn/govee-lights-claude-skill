@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 from .client import GoveeClient
-from .config import STATE_TO_PAYLOAD, TARGET_DEVICES, load_api_key
+from .config import BRIGHTNESS_PERCENT, STATE_TO_PAYLOAD, TARGET_DEVICES, load_api_key
 from .state import SessionEntry, locked_cache
 
 
@@ -18,6 +18,7 @@ def _push_color(state: str) -> None:
             client.set_color_rgb(device.sku, device.device_id, value)
         else:
             client.set_color_temperature(device.sku, device.device_id, value)
+        client.set_brightness(device.sku, device.device_id, BRIGHTNESS_PERCENT)
 
 
 def _apply_state(state: str, session_id: str) -> None:

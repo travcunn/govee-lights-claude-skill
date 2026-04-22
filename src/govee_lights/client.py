@@ -31,19 +31,22 @@ class GoveeClient:
         return r.json().get("data", [])
 
     def set_color_rgb(self, sku: str, device_id: str, rgb: int) -> None:
-        self._control(sku, device_id, "colorRgb", rgb)
+        self._control(sku, device_id, "devices.capabilities.color_setting", "colorRgb", rgb)
 
     def set_color_temperature(self, sku: str, device_id: str, kelvin: int) -> None:
-        self._control(sku, device_id, "colorTemperatureK", kelvin)
+        self._control(sku, device_id, "devices.capabilities.color_setting", "colorTemperatureK", kelvin)
 
-    def _control(self, sku: str, device_id: str, instance: str, value: int) -> None:
+    def set_brightness(self, sku: str, device_id: str, percent: int) -> None:
+        self._control(sku, device_id, "devices.capabilities.range", "brightness", percent)
+
+    def _control(self, sku: str, device_id: str, capability_type: str, instance: str, value: int) -> None:
         payload = {
             "requestId": str(uuid.uuid4()),
             "payload": {
                 "sku": sku,
                 "device": device_id,
                 "capability": {
-                    "type": "devices.capabilities.color_setting",
+                    "type": capability_type,
                     "instance": instance,
                     "value": value,
                 },
