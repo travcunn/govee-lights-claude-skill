@@ -15,7 +15,7 @@ def test_target_devices_are_the_two_office_lights():
 def test_state_payload_map_covers_all_three_states():
     assert set(config.STATE_TO_PAYLOAD) == {"working", "your-turn", "permission"}
     assert config.STATE_TO_PAYLOAD["working"] == ("colorTemperatureK", 2700)
-    assert config.STATE_TO_PAYLOAD["your-turn"] == ("colorRgb", 0x00FF00)
+    assert config.STATE_TO_PAYLOAD["your-turn"] == ("colorRgb", 0x9900FF)
     assert config.STATE_TO_PAYLOAD["permission"] == ("colorRgb", 0xFF0000)
 
 

@@ -21,7 +21,7 @@ TARGET_DEVICES: tuple[Device, ...] = (
 
 STATE_TO_PAYLOAD: dict[str, tuple[str, int]] = {
     "working":    ("colorTemperatureK", 2700),
-    "your-turn":  ("colorRgb", 0x00FF00),
+    "your-turn":  ("colorRgb", 0x9900FF),
     "permission": ("colorRgb", 0xFF0000),
 }
 
