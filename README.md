@@ -2,11 +2,11 @@
 
 Ambient Claude Code state indicator using two Govee H6076 office lights.
 
-- **Warm white** — Claude is working (or no active session)
-- **Purple** — Claude finished, waiting on your input
-- **Red** — Claude needs permission approval
+- **Warm white** — idle / Claude is working
+- **Red** — Claude needs permission approval (sticky until resolved)
+- **Green flash (~2s)** — Claude finished a task or pinged for attention, then fades back to warm
 
-Parallel Claude Code sessions are handled via per-session priority aggregation: the loudest state across any active session wins.
+Parallel Claude Code sessions are handled via per-session priority aggregation: any session holding permission keeps the lights red; otherwise they stay warm. Green flashes are per-event and never override an active red.
 
 ## Prerequisites
 
@@ -30,8 +30,8 @@ cp .env.example .env
 ```bash
 uv run govee-lights list-devices         # prints devices on your account
 uv run govee-lights set-state permission # office lights → red
-uv run govee-lights set-state your-turn  # office lights → purple
 uv run govee-lights set-state working    # office lights → warm white
+uv run govee-lights task-done            # green flash ~2s, then warm
 ```
 
 If `list-devices` works but `set-state` does nothing, confirm the `device_id` and `sku` values in `src/govee_lights/config.py` match entries from `list-devices`.
@@ -44,7 +44,7 @@ Add these to `~/.claude/settings.json` (replace `<REPO_PATH>` with the absolute 
 {
   "hooks": {
     "Notification":     [{ "hooks": [{ "type": "command", "command": "<REPO_PATH>/hooks/govee-hook notify" }] }],
-    "Stop":             [{ "hooks": [{ "type": "command", "command": "<REPO_PATH>/hooks/govee-hook set-state your-turn" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "<REPO_PATH>/hooks/govee-hook task-done" }] }],
     "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "<REPO_PATH>/hooks/govee-hook set-state working" }] }],
     "PreToolUse":       [{ "hooks": [{ "type": "command", "command": "<REPO_PATH>/hooks/govee-hook set-state working" }] }],
     "SessionStart":     [{ "hooks": [{ "type": "command", "command": "<REPO_PATH>/hooks/govee-hook set-state working" }] }],
@@ -62,8 +62,15 @@ Each hook invocation calls `hooks/govee-hook`, which runs `uv run govee-lights <
 1. Acquires a `fcntl.flock` on `~/.cache/govee-lights/state.lock` to serialize parallel sessions.
 2. Updates this session's entry in `~/.cache/govee-lights/state.json` (session ID comes from Claude's hook payload on stdin).
 3. Prunes entries older than 2 minutes (cleans up crashed sessions; live sessions heartbeat on every hook fire, so they never expire).
-4. Computes the aggregate color via priority ladder: `permission > your-turn > working`.
-5. If the aggregate differs from the currently-pushed color, POSTs to the Govee API for each target device. Otherwise exits immediately.
+4. Computes the aggregate sticky color via priority ladder: `permission > working`.
+5. If the aggregate differs from the currently-pushed color, POSTs to the Govee API for each target device.
+
+The `task-done` subcommand (wired to `Stop` and to non-permission `Notification`s) is different:
+
+1. Double-forks into a daemonized grandchild so the hook returns immediately.
+2. Resets this session's entry to `working` and checks the aggregate.
+3. If aggregate is `permission`, the flash is suppressed (red stays up).
+4. Otherwise, pushes green, sleeps 2 seconds, re-checks the aggregate, and pushes warm (or no-ops if a new permission arrived during the sleep).
 
 Every error path logs to stderr and exits 0, so Govee hiccups never block Claude Code.
 

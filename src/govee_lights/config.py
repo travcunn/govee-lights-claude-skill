@@ -21,15 +21,16 @@ TARGET_DEVICES: tuple[Device, ...] = (
 
 STATE_TO_PAYLOAD: dict[str, tuple[str, int]] = {
     "working":    ("colorTemperatureK", 2700),
-    "your-turn":  ("colorRgb", 0x9900FF),
     "permission": ("colorRgb", 0xFF0000),
 }
 
 PRIORITY: dict[str, int] = {
     "working": 1,
-    "your-turn": 2,
-    "permission": 3,
+    "permission": 2,
 }
+
+FLASH_RGB: int = 0x00FF00
+FLASH_DURATION_SECONDS: float = 2.0
 
 CACHE_PATH: Path = Path.home() / ".cache" / "govee-lights" / "state.json"
 SESSION_TTL_SECONDS: int = 2 * 60

@@ -2,6 +2,8 @@ import io
 import json
 from unittest.mock import patch
 
+import pytest
+
 
 def _run_main(argv, stdin_text=""):
     from govee_lights import cli
@@ -117,20 +119,22 @@ def test_notify_picks_permission_when_message_mentions_permission(tmp_path, monk
     assert cache.sessions["sess-N"].state == "permission"
 
 
-def test_notify_falls_back_to_your_turn_for_non_permission_messages(tmp_path, monkeypatch):
+def test_notify_flashes_green_for_non_permission_messages(tmp_path, monkeypatch):
     from govee_lights import cli, config, state
 
     monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
     monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+    monkeypatch.setattr(cli, "_detach", lambda target: target())  # run synchronously
+    monkeypatch.setattr(cli.time, "sleep", lambda s: None)
 
     rgb_calls = []
-    brightness_calls = []
+    kelvin_calls = []
 
     class FakeClient:
         def __init__(self, api_key): pass
         def set_color_rgb(self, sku, device_id, rgb): rgb_calls.append(rgb)
-        def set_color_temperature(self, *a, **kw): rgb_calls.append("kelvin")
-        def set_brightness(self, sku, device_id, percent): brightness_calls.append(percent)
+        def set_color_temperature(self, sku, device_id, kelvin): kelvin_calls.append(kelvin)
+        def set_brightness(self, *a, **kw): pass
 
     monkeypatch.setattr(cli, "GoveeClient", FakeClient)
 
@@ -139,34 +143,151 @@ def test_notify_falls_back_to_your_turn_for_non_permission_messages(tmp_path, mo
         "message": "Claude is waiting for your input",
     })
     assert _run_main(["notify"], stdin_text=payload) == 0
-    assert rgb_calls == [0x9900FF, 0x9900FF]
-    assert brightness_calls == [100, 100]
+    # Flash: green push then warm push.
+    assert rgb_calls == [0x00FF00, 0x00FF00]
+    assert kelvin_calls == [2700, 2700]
+
+    cache = state.load_cache(tmp_path / "state.json")
+    assert cache.sessions["sess-N"].state == "working"
+    assert cache.current_color == "working"
 
 
-def test_notify_defaults_to_your_turn_when_message_field_absent(tmp_path, monkeypatch):
-    from govee_lights import cli, config, state
+def test_notify_flashes_green_when_message_field_absent(tmp_path, monkeypatch):
+    from govee_lights import cli, config
 
     monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
     monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+    monkeypatch.setattr(cli, "_detach", lambda target: target())
+    monkeypatch.setattr(cli.time, "sleep", lambda s: None)
 
     rgb_calls = []
-    brightness_calls = []
 
     class FakeClient:
         def __init__(self, api_key): pass
         def set_color_rgb(self, sku, device_id, rgb): rgb_calls.append(rgb)
-        def set_color_temperature(self, *a, **kw): rgb_calls.append("kelvin")
-        def set_brightness(self, sku, device_id, percent): brightness_calls.append(percent)
+        def set_color_temperature(self, *a, **kw): pass
+        def set_brightness(self, *a, **kw): pass
 
     monkeypatch.setattr(cli, "GoveeClient", FakeClient)
 
-    payload = json.dumps({"session_id": "sess-N"})  # no "message" key
-    assert _run_main(["notify"], stdin_text=payload) == 0
-    assert rgb_calls == [0x9900FF, 0x9900FF]
-    assert brightness_calls == [100, 100]
+    assert _run_main(["notify"], stdin_text=json.dumps({"session_id": "sess-N"})) == 0
+    assert rgb_calls == [0x00FF00, 0x00FF00]
+
+
+def test_task_done_flashes_green_then_restores_warm(tmp_path, monkeypatch):
+    from govee_lights import cli, config, state
+
+    monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+    monkeypatch.setattr(cli, "_detach", lambda target: target())
+
+    sleep_calls = []
+    monkeypatch.setattr(cli.time, "sleep", lambda s: sleep_calls.append(s))
+
+    pushed = []
+
+    class FakeClient:
+        def __init__(self, api_key): pass
+        def set_color_rgb(self, sku, device_id, rgb): pushed.append(("rgb", rgb))
+        def set_color_temperature(self, sku, device_id, kelvin): pushed.append(("kelvin", kelvin))
+        def set_brightness(self, *a, **kw): pass
+
+    monkeypatch.setattr(cli, "GoveeClient", FakeClient)
+
+    payload = json.dumps({"session_id": "sess-D"})
+    assert _run_main(["task-done"], stdin_text=payload) == 0
+
+    # Two devices, so rgb/kelvin each show up twice.
+    rgb_values = [v for kind, v in pushed if kind == "rgb"]
+    kelvin_values = [v for kind, v in pushed if kind == "kelvin"]
+    assert rgb_values == [0x00FF00, 0x00FF00]
+    assert kelvin_values == [2700, 2700]
+    assert sleep_calls == [2.0]
 
     cache = state.load_cache(tmp_path / "state.json")
-    assert cache.sessions["sess-N"].state == "your-turn"
+    assert cache.sessions["sess-D"].state == "working"
+    assert cache.current_color == "working"
+
+
+def test_task_done_skips_flash_when_permission_is_active(tmp_path, monkeypatch):
+    from govee_lights import cli, config, state
+
+    monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+    monkeypatch.setattr(cli, "_detach", lambda target: target())
+
+    # Seed another session already holding permission (red).
+    state.save_cache(
+        state.Cache(
+            sessions={
+                "other": state.SessionEntry(state="permission", updated_at="2099-01-01T00:00:00+00:00"),
+            },
+            current_color="permission",
+        ),
+        tmp_path / "state.json",
+    )
+
+    class ExplodeClient:
+        def __init__(self, api_key): raise AssertionError("should not push Govee while permission is active")
+
+    monkeypatch.setattr(cli, "GoveeClient", ExplodeClient)
+
+    payload = json.dumps({"session_id": "sess-D"})
+    assert _run_main(["task-done"], stdin_text=payload) == 0
+
+    cache = state.load_cache(tmp_path / "state.json")
+    # Our session got added as working, but aggregate still permission, so no push happened.
+    assert cache.sessions["sess-D"].state == "working"
+    assert cache.current_color == "permission"  # unchanged
+
+
+def test_task_done_clears_own_permission_and_flashes(tmp_path, monkeypatch):
+    """If this session was holding permission and Stop fires, the flash should still run
+    because clearing our own entry drops the aggregate down to working."""
+    from govee_lights import cli, config, state
+
+    monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+    monkeypatch.setattr(cli, "_detach", lambda target: target())
+    monkeypatch.setattr(cli.time, "sleep", lambda s: None)
+
+    state.save_cache(
+        state.Cache(
+            sessions={
+                "sess-D": state.SessionEntry(state="permission", updated_at="2099-01-01T00:00:00+00:00"),
+            },
+            current_color="permission",
+        ),
+        tmp_path / "state.json",
+    )
+
+    pushed = []
+
+    class FakeClient:
+        def __init__(self, api_key): pass
+        def set_color_rgb(self, sku, device_id, rgb): pushed.append(("rgb", rgb))
+        def set_color_temperature(self, sku, device_id, kelvin): pushed.append(("kelvin", kelvin))
+        def set_brightness(self, *a, **kw): pass
+
+    monkeypatch.setattr(cli, "GoveeClient", FakeClient)
+
+    payload = json.dumps({"session_id": "sess-D"})
+    assert _run_main(["task-done"], stdin_text=payload) == 0
+
+    rgb_values = [v for kind, v in pushed if kind == "rgb"]
+    kelvin_values = [v for kind, v in pushed if kind == "kelvin"]
+    assert rgb_values == [0x00FF00, 0x00FF00]
+    assert kelvin_values == [2700, 2700]
+
+    cache = state.load_cache(tmp_path / "state.json")
+    assert cache.sessions["sess-D"].state == "working"
+    assert cache.current_color == "working"
+
+
+def test_set_state_rejects_your_turn_argument():
+    from govee_lights import cli
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["set-state", "your-turn"])
 
 
 def test_end_session_removes_entry_and_recomputes_color(tmp_path, monkeypatch):

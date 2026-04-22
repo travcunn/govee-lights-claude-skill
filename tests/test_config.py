@@ -12,16 +12,19 @@ def test_target_devices_are_the_two_office_lights():
         assert d.sku == "H6076"
 
 
-def test_state_payload_map_covers_all_three_states():
-    assert set(config.STATE_TO_PAYLOAD) == {"working", "your-turn", "permission"}
+def test_state_payload_map_covers_sticky_states():
+    assert set(config.STATE_TO_PAYLOAD) == {"working", "permission"}
     assert config.STATE_TO_PAYLOAD["working"] == ("colorTemperatureK", 2700)
-    assert config.STATE_TO_PAYLOAD["your-turn"] == ("colorRgb", 0x9900FF)
     assert config.STATE_TO_PAYLOAD["permission"] == ("colorRgb", 0xFF0000)
 
 
-def test_priority_orders_permission_highest():
-    assert config.PRIORITY["permission"] > config.PRIORITY["your-turn"]
-    assert config.PRIORITY["your-turn"] > config.PRIORITY["working"]
+def test_priority_orders_permission_over_working():
+    assert config.PRIORITY["permission"] > config.PRIORITY["working"]
+
+
+def test_flash_config_is_pure_green_two_seconds():
+    assert config.FLASH_RGB == 0x00FF00
+    assert config.FLASH_DURATION_SECONDS == 2.0
 
 
 def test_cache_path_is_under_user_cache_dir():

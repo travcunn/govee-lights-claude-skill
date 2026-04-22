@@ -36,8 +36,8 @@ def test_load_cache_returns_empty_cache_when_file_corrupt(tmp_path):
 def test_save_cache_round_trips(tmp_path):
     path = tmp_path / "nested" / "state.json"
     cache = Cache(
-        sessions={"sid-1": SessionEntry(state="your-turn", updated_at="2026-04-22T00:00:00+00:00")},
-        current_color="your-turn",
+        sessions={"sid-1": SessionEntry(state="permission", updated_at="2026-04-22T00:00:00+00:00")},
+        current_color="permission",
     )
     save_cache(cache, path)
     assert load_cache(path) == cache
@@ -57,18 +57,17 @@ def test_aggregate_state_returns_working_when_no_sessions():
 def test_aggregate_state_picks_highest_priority():
     c = Cache(sessions={
         "a": SessionEntry(state="working", updated_at="2026-04-22T00:00:00+00:00"),
-        "b": SessionEntry(state="your-turn", updated_at="2026-04-22T00:00:00+00:00"),
-        "c": SessionEntry(state="permission", updated_at="2026-04-22T00:00:00+00:00"),
+        "b": SessionEntry(state="permission", updated_at="2026-04-22T00:00:00+00:00"),
     })
     assert c.aggregate_state() == "permission"
 
 
-def test_aggregate_state_your_turn_beats_working():
+def test_aggregate_state_is_working_when_all_sessions_working():
     c = Cache(sessions={
         "a": SessionEntry(state="working", updated_at="2026-04-22T00:00:00+00:00"),
-        "b": SessionEntry(state="your-turn", updated_at="2026-04-22T00:00:00+00:00"),
+        "b": SessionEntry(state="working", updated_at="2026-04-22T00:00:00+00:00"),
     })
-    assert c.aggregate_state() == "your-turn"
+    assert c.aggregate_state() == "working"
 
 
 def test_prune_stale_removes_entries_older_than_ttl():
