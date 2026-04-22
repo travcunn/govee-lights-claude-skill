@@ -64,6 +64,14 @@ def cmd_set_state(args: argparse.Namespace) -> None:
     _apply_state(args.state, session_id)
 
 
+def cmd_notify(args: argparse.Namespace) -> None:
+    payload = _read_hook_payload()
+    session_id = payload.get("session_id", "manual")
+    message = (payload.get("message") or "").lower()
+    state = "permission" if "permission" in message else "your-turn"
+    _apply_state(state, session_id)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="govee-lights")
     sub = p.add_subparsers(dest="command", required=True)
@@ -71,6 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     ss = sub.add_parser("set-state", help="Set current session to a state")
     ss.add_argument("state", choices=["working", "your-turn", "permission"])
     ss.set_defaults(func=cmd_set_state)
+
+    nt = sub.add_parser("notify", help="Parse Claude Notification hook payload")
+    nt.set_defaults(func=cmd_notify)
 
     return p
 
