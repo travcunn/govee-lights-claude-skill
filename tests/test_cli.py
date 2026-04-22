@@ -203,3 +203,24 @@ def test_end_session_is_noop_without_session_id(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "GoveeClient", ExplodeClient)
 
     assert _run_main(["end-session"], stdin_text="{}") == 0
+
+
+def test_list_devices_prints_device_rows(monkeypatch, capsys):
+    from govee_lights import cli
+
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+
+    class FakeClient:
+        def __init__(self, api_key): pass
+        def list_devices(self):
+            return [
+                {"deviceName": "Office light 1", "sku": "H6076", "device": "AA:BB"},
+                {"deviceName": "TV light",       "sku": "H6168", "device": "CC:DD"},
+            ]
+
+    monkeypatch.setattr(cli, "GoveeClient", FakeClient)
+
+    assert _run_main(["list-devices"]) == 0
+    out = capsys.readouterr().out
+    assert "Office light 1" in out and "AA:BB" in out
+    assert "TV light" in out and "CC:DD" in out

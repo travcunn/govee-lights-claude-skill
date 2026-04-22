@@ -80,6 +80,13 @@ def cmd_end_session(args: argparse.Namespace) -> None:
     _remove_session(session_id)
 
 
+def cmd_list_devices(args: argparse.Namespace) -> None:
+    client = GoveeClient(api_key=load_api_key())
+    for d in client.list_devices():
+        name = d.get("deviceName", "?")
+        print(f"{name:<25} sku={d['sku']:<18} device={d['device']}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="govee-lights")
     sub = p.add_subparsers(dest="command", required=True)
@@ -93,6 +100,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     es = sub.add_parser("end-session", help="Drop this session from the aggregate")
     es.set_defaults(func=cmd_end_session)
+
+    ld = sub.add_parser("list-devices", help="Print Govee devices on this account")
+    ld.set_defaults(func=cmd_list_devices)
 
     return p
 
