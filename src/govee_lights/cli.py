@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from .client import GoveeClient
@@ -10,15 +11,24 @@ from .config import BRIGHTNESS_PERCENT, STATE_TO_PAYLOAD, TARGET_DEVICES, load_a
 from .state import SessionEntry, locked_cache
 
 
+def _push_device(client: GoveeClient, device, instance: str, value: int) -> None:
+    if instance == "colorRgb":
+        client.set_color_rgb(device.sku, device.device_id, value)
+    else:
+        client.set_color_temperature(device.sku, device.device_id, value)
+    client.set_brightness(device.sku, device.device_id, BRIGHTNESS_PERCENT)
+
+
 def _push_color(state: str) -> None:
     instance, value = STATE_TO_PAYLOAD[state]
     client = GoveeClient(api_key=load_api_key())
-    for device in TARGET_DEVICES:
-        if instance == "colorRgb":
-            client.set_color_rgb(device.sku, device.device_id, value)
-        else:
-            client.set_color_temperature(device.sku, device.device_id, value)
-        client.set_brightness(device.sku, device.device_id, BRIGHTNESS_PERCENT)
+    with ThreadPoolExecutor(max_workers=len(TARGET_DEVICES)) as pool:
+        futures = [
+            pool.submit(_push_device, client, device, instance, value)
+            for device in TARGET_DEVICES
+        ]
+        for f in futures:
+            f.result()
 
 
 def _apply_state(state: str, session_id: str) -> None:
