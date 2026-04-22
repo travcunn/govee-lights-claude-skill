@@ -72,6 +72,14 @@ def cmd_notify(args: argparse.Namespace) -> None:
     _apply_state(resolved_state, session_id)
 
 
+def cmd_end_session(args: argparse.Namespace) -> None:
+    payload = _read_hook_payload()
+    session_id = payload.get("session_id")
+    if not session_id:
+        return
+    _remove_session(session_id)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="govee-lights")
     sub = p.add_subparsers(dest="command", required=True)
@@ -82,6 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     nt = sub.add_parser("notify", help="Parse Claude Notification hook payload")
     nt.set_defaults(func=cmd_notify)
+
+    es = sub.add_parser("end-session", help="Drop this session from the aggregate")
+    es.set_defaults(func=cmd_end_session)
 
     return p
 

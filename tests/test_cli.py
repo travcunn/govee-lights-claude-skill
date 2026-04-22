@@ -152,3 +152,54 @@ def test_notify_defaults_to_your_turn_when_message_field_absent(tmp_path, monkey
 
     cache = state.load_cache(tmp_path / "state.json")
     assert cache.sessions["sess-N"].state == "your-turn"
+
+
+def test_end_session_removes_entry_and_recomputes_color(tmp_path, monkeypatch):
+    from govee_lights import cli, config, state
+
+    monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+
+    state.save_cache(
+        state.Cache(
+            sessions={
+                "A": state.SessionEntry(state="permission", updated_at="2099-01-01T00:00:00+00:00"),
+                "B": state.SessionEntry(state="working",    updated_at="2099-01-01T00:00:00+00:00"),
+            },
+            current_color="permission",
+        ),
+        tmp_path / "state.json",
+    )
+
+    calls = []
+
+    class FakeClient:
+        def __init__(self, api_key): pass
+        def set_color_rgb(self, sku, device_id, rgb): calls.append(("rgb", rgb))
+        def set_color_temperature(self, sku, device_id, kelvin): calls.append(("kelvin", kelvin))
+
+    monkeypatch.setattr(cli, "GoveeClient", FakeClient)
+
+    payload = json.dumps({"session_id": "A"})
+    assert _run_main(["end-session"], stdin_text=payload) == 0
+
+    assert calls == [("kelvin", 2700), ("kelvin", 2700)]
+
+    cache = state.load_cache(tmp_path / "state.json")
+    assert "A" not in cache.sessions
+    assert "B" in cache.sessions
+    assert cache.current_color == "working"
+
+
+def test_end_session_is_noop_without_session_id(tmp_path, monkeypatch):
+    from govee_lights import cli, config
+
+    monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+
+    class ExplodeClient:
+        def __init__(self, api_key): raise AssertionError("should not construct client")
+
+    monkeypatch.setattr(cli, "GoveeClient", ExplodeClient)
+
+    assert _run_main(["end-session"], stdin_text="{}") == 0
