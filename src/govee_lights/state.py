@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Iterator
 
 from . import config
 
@@ -87,3 +90,19 @@ def save_cache(cache: Cache, path: Path | None = None) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+@contextmanager
+def locked_cache(path: Path | None = None) -> Iterator[Cache]:
+    if path is None:
+        path = config.CACHE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_suffix(".lock")
+    with lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            cache = load_cache(path)
+            yield cache
+            save_cache(cache, path)
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)

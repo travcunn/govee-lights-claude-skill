@@ -1,3 +1,6 @@
+import multiprocessing
+import time
+
 import pytest
 from datetime import datetime, timezone
 
@@ -104,3 +107,42 @@ def test_prune_stale_falls_back_to_config_session_ttl(monkeypatch):
     })
     c.prune_stale(now)  # no explicit ttl, should use config.SESSION_TTL_SECONDS
     assert list(c.sessions) == ["fresh"]
+
+
+def test_locked_cache_yields_cache_and_persists_changes(tmp_path):
+    from govee_lights.state import locked_cache
+    path = tmp_path / "state.json"
+
+    with locked_cache(path) as cache:
+        cache.sessions["s1"] = SessionEntry(state="permission", updated_at="2026-04-22T00:00:00+00:00")
+        cache.current_color = "permission"
+
+    reloaded = load_cache(path)
+    assert reloaded.current_color == "permission"
+    assert "s1" in reloaded.sessions
+
+
+def _hold_lock_and_write(path_str, marker_str, hold_seconds):
+    from pathlib import Path as _Path
+    from govee_lights.state import locked_cache, SessionEntry
+    with locked_cache(_Path(path_str)) as cache:
+        cache.sessions[marker_str] = SessionEntry(state="working", updated_at="2026-04-22T00:00:00+00:00")
+        time.sleep(hold_seconds)
+
+
+def test_locked_cache_serializes_concurrent_writers(tmp_path):
+    path = tmp_path / "state.json"
+
+    p1 = multiprocessing.Process(target=_hold_lock_and_write, args=(str(path), "first", 0.4))
+    p2 = multiprocessing.Process(target=_hold_lock_and_write, args=(str(path), "second", 0.0))
+
+    p1.start()
+    time.sleep(0.05)  # ensure p1 acquires first
+    p2.start()
+    p1.join(timeout=5)
+    p2.join(timeout=5)
+
+    assert p1.exitcode == 0 and p2.exitcode == 0
+    final = load_cache(path)
+    assert "first" in final.sessions
+    assert "second" in final.sessions
