@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Thin wrapper so Claude Code hooks can invoke govee-lights from anywhere.
+# Resolves the repo root via the script's own location.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$HERE/.." && pwd)"
+exec uv --directory "$REPO_ROOT" run govee-lights "$@"
