@@ -68,8 +68,8 @@ def cmd_notify(args: argparse.Namespace) -> None:
     payload = _read_hook_payload()
     session_id = payload.get("session_id", "manual")
     message = (payload.get("message") or "").lower()
-    state = "permission" if "permission" in message else "your-turn"
-    _apply_state(state, session_id)
+    resolved_state = "permission" if "permission" in message else "your-turn"
+    _apply_state(resolved_state, session_id)
 
 
 def build_parser() -> argparse.ArgumentParser:

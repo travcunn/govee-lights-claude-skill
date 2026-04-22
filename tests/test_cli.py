@@ -129,3 +129,26 @@ def test_notify_falls_back_to_your_turn_for_non_permission_messages(tmp_path, mo
     })
     assert _run_main(["notify"], stdin_text=payload) == 0
     assert calls == [0xFFCC00, 0xFFCC00]
+
+
+def test_notify_defaults_to_your_turn_when_message_field_absent(tmp_path, monkeypatch):
+    from govee_lights import cli, config, state
+
+    monkeypatch.setattr(config, "CACHE_PATH", tmp_path / "state.json")
+    monkeypatch.setenv("GOVEE_API_KEY", "test-key")
+
+    calls = []
+
+    class FakeClient:
+        def __init__(self, api_key): pass
+        def set_color_rgb(self, sku, device_id, rgb): calls.append(rgb)
+        def set_color_temperature(self, *a, **kw): calls.append("kelvin")
+
+    monkeypatch.setattr(cli, "GoveeClient", FakeClient)
+
+    payload = json.dumps({"session_id": "sess-N"})  # no "message" key
+    assert _run_main(["notify"], stdin_text=payload) == 0
+    assert calls == [0xFFCC00, 0xFFCC00]
+
+    cache = state.load_cache(tmp_path / "state.json")
+    assert cache.sessions["sess-N"].state == "your-turn"
