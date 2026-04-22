@@ -37,8 +37,8 @@ def test_load_api_key_reads_environment(monkeypatch):
     assert config.load_api_key() == "test-key-123"
 
 
-def test_load_api_key_raises_when_missing(monkeypatch, tmp_path, chdir):
+def test_load_api_key_raises_when_missing(monkeypatch):
     monkeypatch.delenv("GOVEE_API_KEY", raising=False)
-    chdir(tmp_path)
+    monkeypatch.setattr("govee_lights.config.load_dotenv", lambda: None)
     with pytest.raises(RuntimeError, match="GOVEE_API_KEY"):
         config.load_api_key()
