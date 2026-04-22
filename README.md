@@ -3,7 +3,7 @@
 Ambient Claude Code state indicator using two Govee H6076 office lights.
 
 - **Warm white** — Claude is working (or no active session)
-- **Yellow** — Claude finished, waiting on your input
+- **Green** — Claude finished, waiting on your input
 - **Red** — Claude needs permission approval
 
 Parallel Claude Code sessions are handled via per-session priority aggregation: the loudest state across any active session wins.
@@ -30,7 +30,7 @@ cp .env.example .env
 ```bash
 uv run govee-lights list-devices         # prints devices on your account
 uv run govee-lights set-state permission # office lights → red
-uv run govee-lights set-state your-turn  # office lights → yellow
+uv run govee-lights set-state your-turn  # office lights → green
 uv run govee-lights set-state working    # office lights → warm white
 ```
 

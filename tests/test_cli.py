@@ -139,7 +139,7 @@ def test_notify_falls_back_to_your_turn_for_non_permission_messages(tmp_path, mo
         "message": "Claude is waiting for your input",
     })
     assert _run_main(["notify"], stdin_text=payload) == 0
-    assert rgb_calls == [0xFFCC00, 0xFFCC00]
+    assert rgb_calls == [0x00FF00, 0x00FF00]
     assert brightness_calls == [100, 100]
 
 
@@ -162,7 +162,7 @@ def test_notify_defaults_to_your_turn_when_message_field_absent(tmp_path, monkey
 
     payload = json.dumps({"session_id": "sess-N"})  # no "message" key
     assert _run_main(["notify"], stdin_text=payload) == 0
-    assert rgb_calls == [0xFFCC00, 0xFFCC00]
+    assert rgb_calls == [0x00FF00, 0x00FF00]
     assert brightness_calls == [100, 100]
 
     cache = state.load_cache(tmp_path / "state.json")
